@@ -17,7 +17,7 @@ if %errorlevel% neq 0 (
 
 echo.
 echo [2] 启动 Flask 后端...
-start "Flask Backend" cmd /k "cd /d %~dp0 && .env\Scripts\python.exe backend/app.py"
+start "Flask Backend" cmd /k "cd /d %~dp0 && .env\Scripts\pip.exe install eventlet && .env\Scripts\python.exe backend/app.py"
 
 echo.
 echo [3] 启动爬虫 Workers...
