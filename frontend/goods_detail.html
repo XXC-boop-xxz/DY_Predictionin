@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>商品详情 - 抖音电商热点分析系统</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <link href="css/fonts.css" rel="stylesheet"/>
+    <script src="lib/vue.global.js"></script>
+    <script src="lib/tailwind.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#13c8ec",
+                        "background-light": "#f6f8f8",
+                        "background-dark": "#101f22",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #e7f1f3; }
+        .dark ::-webkit-scrollbar-track { background: #1f3a3e; }
+        ::-webkit-scrollbar-thumb { background: #13c8ec; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #0fa8c9; }
+        [v-cloak] { display: none !important; }
+        .tech-grid {
+            background-image: radial-gradient(#13c8ec 0.5px, transparent 0.5px);
+            background-size: 24px 24px;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-[#0d191b] dark:text-white transition-colors duration-300">
+
+<div id="app" v-cloak>
+    <!-- 顶部导航 -->
+    <header class="flex items-center justify-between border-b border-[#e7f1f3] dark:border-[#1f3a3e] px-10 py-3 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md sticky top-0 z-50">
+        <div class="flex items-center gap-4">
+            <button @click="goBack" class="p-2 hover:bg-[#e7f1f3] dark:hover:bg-[#1f3a3e] rounded-lg transition-colors">
+                <span class="material-symbols-outlined">arrow_back</span>
+            </button>
+            <div class="flex items-center gap-4">
+                <div class="size-8 text-primary">
+                    <span class="material-symbols-outlined text-4xl">insights</span>
+                </div>
+                <h1 class="text-xl font-bold">商品详情</h1>
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            <!-- 主题切换按钮 -->
+            <button @click="toggleTheme" class="p-2 rounded-lg hover:bg-[#e7f1f3] dark:hover:bg-[#1f3a3e] transition-colors">
+                <span v-if="isDark" class="material-symbols-outlined text-yellow-400">light_mode</span>
+                <span v-else class="material-symbols-outlined">dark_mode</span>
+            </button>
+            <button class="flex items-center gap-2 px-4 py-2 bg-primary/20 text-primary rounded-lg hover:bg-primary/30 transition-colors border border-primary/30">
+                <span class="material-symbols-outlined text-sm">favorite_border</span>
+                <span class="font-medium">收藏</span>
+            </button>
+            <button class="flex items-center gap-2 px-4 py-2 bg-[#e7f1f3] dark:bg-[#1f3a3e] rounded-lg hover:opacity-90 transition-opacity">
+                <span class="material-symbols-outlined text-sm">share</span>
+                <span class="font-medium">分享</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- 加载状态 -->
+    <div v-if="loading" class="flex items-center justify-center min-h-screen">
+        <div class="text-center relative">
+            <div class="absolute inset-0 tech-grid opacity-5"></div>
+            <div class="relative z-10">
+                <div class="inline-block animate-spin rounded-full h-16 w-16 border-4 border-primary border-t-transparent"></div>
+                <div class="mt-6 text-lg text-[#4c8d9a] dark:text-[#a0c4cc]">加载中...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 错误状态 -->
+    <div v-else-if="error" class="flex items-center justify-center min-h-screen">
+        <div class="text-center relative">
+            <div class="absolute inset-0 tech-grid opacity-5"></div>
+            <div class="relative z-10">
+                <span class="material-symbols-outlined text-8xl text-red-400">error</span>
+                <div class="mt-6 text-2xl font-bold">{{ error }}</div>
+                <button @click="goBack" class="mt-8 px-8 py-3 bg-primary text-[#0d191b] rounded-lg font-bold hover:opacity-90 transition-opacity">
+                    返回列表
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 商品详情内容 -->
+    <div v-else-if="goods" class="max-w-[1400px] mx-auto px-6 py-8">
+        <!-- 商品基本信息 -->
+        <div class="grid grid-cols-1 lg:grid-cols-[480px_1fr] gap-8 mb-8">
+            <!-- 左侧：图片 - 不固定 -->
+            <div>
+                <div class="aspect-square rounded-xl overflow-hidden bg-white dark:bg-[#1a2e32] border border-[#e7f1f3] dark:border-[#2a454a] shadow-lg">
+                    <img :src="goods.cover" :alt="goods.title" 
+                         class="w-full h-full object-cover"
+                         @error="$event.target.src='https://via.placeholder.com/800x800?text=No+Image'">
+                </div>
+            </div>
+            
+            <!-- 右侧：基本信息 -->
+            <div class="space-y-5">
+                <!-- 标题 -->
+                <h2 class="text-2xl font-bold leading-tight">{{ goods.title }}</h2>
+                
+                <!-- 标签 -->
+                <div v-if="goods.labels && goods.labels.length > 0" class="flex flex-wrap gap-2">
+                    <span v-for="(label, idx) in goods.labels" :key="idx"
+                          class="px-3 py-1 bg-primary/10 text-primary text-xs font-medium rounded border border-primary/20">
+                        {{ typeof label === 'string' ? label : label.name }}
+                    </span>
+                </div>
+                
+                <!-- 价格信息 -->
+                <div class="bg-[#f6f8f8] dark:bg-[#16282b] rounded-lg p-5 border border-[#e7f1f3] dark:border-[#2a454a]">
+                    <div class="flex items-baseline gap-3 mb-4">
+                        <span class="text-xs text-[#4c8d9a] dark:text-[#a0c4cc]">价格</span>
+                        <span class="text-4xl font-bold text-red-500">¥{{ (goods.price || 0).toFixed(2) }}</span>
+                        <span v-if="(goods.coupon || 0) > 0" class="text-lg text-[#4c8d9a] dark:text-[#a0c4cc] line-through">
+                            ¥{{ ((goods.price || 0) + (goods.coupon || 0)).toFixed(2) }}
+                        </span>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-white dark:bg-[#1a2e32] rounded-lg p-4 border border-[#e7f1f3] dark:border-[#2a454a]">
+                            <div class="text-xs text-[#4c8d9a] dark:text-[#a0c4cc] mb-1">佣金比例</div>
+                            <div class="text-2xl font-bold text-primary">{{ (goods.cos_ratio || 0).toFixed(2) }}%</div>
+                        </div>
+                        <div class="bg-white dark:bg-[#1a2e32] rounded-lg p-4 border border-[#e7f1f3] dark:border-[#2a454a]">
+                            <div class="text-xs text-[#4c8d9a] dark:text-[#a0c4cc] mb-1">预估佣金</div>
+                            <div class="text-2xl font-bold text-primary">¥{{ (goods.cos_fee || 0).toFixed(2) }}</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 店铺信息 -->
+                <div class="bg-[#f6f8f8] dark:bg-[#16282b] rounded-lg p-5 border border-[#e7f1f3] dark:border-[#2a454a]">
+                    <div class="text-xs text-[#4c8d9a] dark:text-[#a0c4cc] mb-3">店铺信息</div>
+                    <div class="flex items-center gap-3">
+                        <img v-if="goods.shop_logo" 
+                             :src="goods.shop_logo" 
+                             class="w-12 h-12 rounded-full border border-primary/30"
+                             @error="$event.target.src='https://via.placeholder.com/48x48?text=Shop'">
+                        <div class="flex-1">
+                            <div class="font-semibold">{{ goods.shop_name || '未知店铺' }}</div>
+                            <div class="text-xs text-[#4c8d9a] dark:text-[#a0c4cc]">ID: {{ goods.shop_id || '-' }}</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 销售数据 -->
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="bg-[#f6f8f8] dark:bg-[#16282b] rounded-lg p-4 text-center border border-[#e7f1f3] dark:border-[#2a454a]">
+                        <div class="text-2xl font-bold text-primary mb-1">{{ (goods.sales || 0).toLocaleString() }}</div>
+                        <div class="text-xs text-[#4c8d9a] dark:text-[#a0c4cc]">总销量</div>
+                    </div>
+                    <div class="bg-[#f6f8f8] dark:bg-[#16282b] rounded-lg p-4 text-center border border-[#e7f1f3] dark:border-[#2a454a]">
+                        <div class="text-2xl font-bold text-primary mb-1">{{ (goods.view_num || 0).toLocaleString() }}</div>
+                        <div class="text-xs text-[#4c8d9a] dark:text-[#a0c4cc]">浏览量</div>
+                    </div>
+                    <div class="bg-[#f6f8f8] dark:bg-[#16282b] rounded-lg p-4 text-center border border-[#e7f1f3] dark:border-[#2a454a]">
+                        <div class="text-2xl font-bold text-primary mb-1">{{ (goods.kol_num || 0).toLocaleString() }}</div>
+                        <div class="text-xs text-[#4c8d9a] dark:text-[#a0c4cc]">带货达人</div>
+                    </div>
+                </div>
+                
+                <!-- 操作按钮 -->
+                <div class="flex gap-3">
+                    <a :href="goods.url" target="_blank" 
+                       class="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-primary text-[#0d191b] rounded-lg font-semibold hover:opacity-90 transition-opacity">
+                        <span class="material-symbols-outlined text-lg">open_in_new</span>
+                        <span>查看原商品</span>
+                    </a>
+                    <button class="px-5 py-3 bg-[#e7f1f3] dark:bg-[#1f3a3e] rounded-lg hover:opacity-90 transition-opacity">
+                        <span class="material-symbols-outlined">download</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 数据分析标签页 -->
+        <div class="bg-card-dark rounded-xl border border-input-border overflow-hidden">
+            <!-- 标签头 -->
+            <div class="flex gap-1 p-2 bg-surface-dark border-b border-input-border overflow-x-auto">
+                <button @click="activeTab = 'trend'" 
+                        :class="['px-6 py-3 rounded-lg font-medium transition-all whitespace-nowrap', 
+                                 activeTab === 'trend' ? 'bg-primary text-background-dark' : 'text-text-secondary hover:bg-input-bg hover:text-text-primary']">
+                    <span class="material-symbols-outlined text-sm align-middle mr-1">analytics</span>
+                    基础分析
+                </button>
+                <button @click="activeTab = 'kol'" 
+                        :class="['px-6 py-3 rounded-lg font-medium transition-all whitespace-nowrap', 
+                                 activeTab === 'kol' ? 'bg-primary text-background-dark' : 'text-text-secondary hover:bg-input-bg hover:text-text-primary']">
+                    <span class="material-symbols-outlined text-sm align-middle mr-1">person</span>
+                    达人分析
+                </button>
+                <button @click="activeTab = 'video'" 
+                        :class="['px-6 py-3 rounded-lg font-medium transition-all whitespace-nowrap', 
+                                 activeTab === 'video' ? 'bg-primary text-background-dark' : 'text-text-secondary hover:bg-input-bg hover:text-text-primary']">
+                    <span class="material-symbols-outlined text-sm align-middle mr-1">videocam</span>
+                    视频分析
+                </button>
+                <button @click="activeTab = 'live'" 
+                        :class="['px-6 py-3 rounded-lg font-medium transition-all whitespace-nowrap', 
+                                 activeTab === 'live' ? 'bg-primary text-background-dark' : 'text-text-secondary hover:bg-input-bg hover:text-text-primary']">
+                    <span class="material-symbols-outlined text-sm align-middle mr-1">live_tv</span>
+                    直播分析
+                </button>
+            </div>
+            
+            <!-- 标签内容 -->
+            <div class="p-6">
+                <!-- 基础分析 -->
+                <div v-show="activeTab === 'trend'" class="space-y-6">
+                    <!-- 核心数据 -->
+                    <div>
+                        <h3 class="text-lg font-bold mb-4 flex items-center gap-2">
+                            <span class="material-symbols-outlined text-primary">analytics</span>
+                            <span>核心数据</span>
+                        </h3>
+                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                            <div class="bg-[#f6f8f8] dark:bg-[#16282b] rounded-lg p-4 text-center border border-[#e7f1f3] dark:border-[#2a454a]">
+                                <div class="text-2xl font-bold mb-1">0</div>
+                                <div class="text-xs text-[#4c8d9a] dark:text-[#a0c4cc] mb-1">浏览量</div>
+                                <div class="text-xs text-green-400">增幅 0-30%</div>
+                            </div>
+                            <div class="bg-[#f6f8f8] dark:bg-[#16282b] rounded-lg p-4 text-center border border-[#e7f1f3] dark:border-[#2a454a]">
+                                <div class="text-2xl font-bold mb-1">0</div>
+                                <div class="text-xs text-[#4c8d9a] dark:text-[#a0c4cc]">商品销量</div>
+                            </div>
+                            <div class="bg-[#f6f8f8] dark:bg-[#16282b] rounded-lg p-4 text-center border border-[#e7f1f3] dark:border-[#2a454a]">
+                                <div class="text-2xl font-bold mb-1">0</div>
+                                <div class="text-xs text-[#4c8d9a] dark:text-[#a0c4cc] mb-1">商品销售额</div>
+                                <div class="text-xs text-green-400">增幅 0-30%</div>
+                            </div>
+                            <div class="bg-[#f6f8f8] dark:bg-[#16282b] rounded-lg p-4 text-center border border-[#e7f1f3] dark:border-[#2a454a]">
+                                <div class="text-2xl font-bold mb-1">0</div>
+                                <div class="text-xs text-[#4c8d9a] dark:text-[#a0c4cc]">支付买人</div>
+                            </div>
+                            <div class="bg-[#f6f8f8] dark:bg-[#16282b] rounded-lg p-4 text-center border border-[#e7f1f3] dark:border-[#2a454a]">
+                                <div class="text-2xl font-bold mb-1">0</div>
+                                <div class="text-xs text-[#4c8d9a] dark:text-[#a0c4cc] mb-1">支付直播</div>
+                                <div class="text-xs text-green-400">增幅率 0-30%</div>
+                            </div>
+                            <div class="bg-[#f6f8f8] dark:bg-[#16282b] rounded-lg p-4 text-center border border-[#e7f1f3] dark:border-[#2a454a]">
+                                <div class="text-2xl font-bold mb-1">0</div>
+                                <div class="text-xs text-[#4c8d9a] dark:text-[#a0c4cc] mb-1">支付视频</div>
+                                <div class="text-xs text-green-400">增幅率 0-30%</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 趋势图表 -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div class="bg-[#f6f8f8] dark:bg-[#16282b] rounded-lg p-5 border border-[#e7f1f3] dark:border-[#2a454a]">
+                            <h4 class="font-semibold mb-4 text-sm">商品销量趋势</h4>
+                            <div class="h-64 flex items-center justify-center text-[#4c8d9a] dark:text-[#a0c4cc]">
+                                <div class="text-center">
+                                    <span class="material-symbols-outlined text-7xl opacity-10">show_chart</span>
+                                    <div class="mt-3 text-sm">暂无数据</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-[#f6f8f8] dark:bg-[#16282b] rounded-lg p-5 border border-[#e7f1f3] dark:border-[#2a454a]">
+                            <h4 class="font-semibold mb-4 text-sm">商品销售额&浏览量</h4>
+                            <div class="h-64 flex items-center justify-center text-[#4c8d9a] dark:text-[#a0c4cc]">
+                                <div class="text-center">
+                                    <span class="material-symbols-outlined text-7xl opacity-10">show_chart</span>
+                                    <div class="mt-3 text-sm">暂无数据</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 达人分析 -->
+                <div v-show="activeTab === 'kol'" class="space-y-4">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div class="bg-[#f6f8f8] dark:bg-[#16282b] rounded-lg p-5 border border-[#e7f1f3] dark:border-[#2a454a]">
+                            <h4 class="font-semibold mb-4 text-sm">每日大获取视频&总次数</h4>
+                            <div class="h-64 flex items-center justify-center text-[#4c8d9a] dark:text-[#a0c4cc]">
+                                <div class="text-center">
+                                    <span class="material-symbols-outlined text-7xl opacity-10">person</span>
+                                    <div class="mt-3 text-sm">暂无数据</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-[#f6f8f8] dark:bg-[#16282b] rounded-lg p-5 border border-[#e7f1f3] dark:border-[#2a454a]">
+                            <h4 class="font-semibold mb-4 text-sm">新增大获取人&总次数</h4>
+                            <div class="h-64 flex items-center justify-center text-[#4c8d9a] dark:text-[#a0c4cc]">
+                                <div class="text-center">
+                                    <span class="material-symbols-outlined text-7xl opacity-10">person_add</span>
+                                    <div class="mt-3 text-sm">暂无数据</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 视频分析 -->
+                <div v-show="activeTab === 'video'">
+                    <div class="bg-[#f6f8f8] dark:bg-[#16282b] rounded-lg p-5 border border-[#e7f1f3] dark:border-[#2a454a]">
+                        <h4 class="font-semibold mb-4 text-sm">视频数据分析</h4>
+                        <div class="h-64 flex items-center justify-center text-[#4c8d9a] dark:text-[#a0c4cc]">
+                            <div class="text-center">
+                                <span class="material-symbols-outlined text-7xl opacity-10">videocam</span>
+                                <div class="mt-3 text-sm">暂无数据</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 直播分析 -->
+                <div v-show="activeTab === 'live'">
+                    <div class="bg-[#f6f8f8] dark:bg-[#16282b] rounded-lg p-5 border border-[#e7f1f3] dark:border-[#2a454a]">
+                        <h4 class="font-semibold mb-4 text-sm">直播数据分析</h4>
+                        <div class="h-64 flex items-center justify-center text-[#4c8d9a] dark:text-[#a0c4cc]">
+                            <div class="text-center">
+                                <span class="material-symbols-outlined text-7xl opacity-10">live_tv</span>
+                                <div class="mt-3 text-sm">暂无数据</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const { createApp, ref, onMounted } = Vue
+
+createApp({
+    setup() {
+        const loading = ref(true)
+        const error = ref(null)
+        const goods = ref(null)
+        const activeTab = ref('trend')
+        const isDark = ref(false)
+        
+        // 主题切换
+        onMounted(() => {
+            const savedTheme = localStorage.getItem('theme')
+            if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                isDark.value = true
+                document.documentElement.classList.add('dark')
+            }
+            loadGoodsDetail()
+        })
+        
+        const toggleTheme = () => {
+            isDark.value = !isDark.value
+            if (isDark.value) {
+                document.documentElement.classList.add('dark')
+                localStorage.setItem('theme', 'dark')
+            } else {
+                document.documentElement.classList.remove('dark')
+                localStorage.setItem('theme', 'light')
+            }
+        }
+        
+        // 加载商品详情
+        const loadGoodsDetail = async () => {
+            const params = new URLSearchParams(window.location.search)
+            const productId = params.get('id')
+            
+            console.log('=== 加载商品详情 ===')
+            console.log('商品ID:', productId)
+            
+            if (!productId) {
+                error.value = '缺少商品ID参数'
+                loading.value = false
+                return
+            }
+            
+            try {
+                const token = localStorage.getItem('token')
+                console.log('Token:', token ? '存在' : '不存在')
+                
+                if (!token) {
+                    window.location.href = 'login.html'
+                    return
+                }
+                
+                const apiUrl = `http://localhost:5000/api/goods/detail/${productId}`
+                console.log('请求URL:', apiUrl)
+                
+                const response = await fetch(apiUrl, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                })
+                
+                console.log('响应状态:', response.status)
+                
+                const result = await response.json()
+                console.log('响应数据:', result)
+                
+                if (result.code === 0) {
+                    goods.value = result.data
+                    
+                    // 转换数值字段
+                    if (goods.value.price) goods.value.price = parseFloat(goods.value.price) || 0
+                    if (goods.value.coupon) goods.value.coupon = parseFloat(goods.value.coupon) || 0
+                    if (goods.value.cos_ratio) goods.value.cos_ratio = parseFloat(goods.value.cos_ratio) || 0
+                    if (goods.value.cos_fee) goods.value.cos_fee = parseFloat(goods.value.cos_fee) || 0
+                    if (goods.value.sales) goods.value.sales = parseInt(goods.value.sales) || 0
+                    if (goods.value.view_num) goods.value.view_num = parseInt(goods.value.view_num) || 0
+                    if (goods.value.kol_num) goods.value.kol_num = parseInt(goods.value.kol_num) || 0
+                    
+                    // 解析JSON字段
+                    if (typeof goods.value.labels === 'string') {
+                        try {
+                            goods.value.labels = JSON.parse(goods.value.labels)
+                        } catch (e) {
+                            goods.value.labels = []
+                        }
+                    }
+                    
+                    // 更新页面标题
+                    document.title = `${goods.value.title} - 商品详情`
+                    console.log('✓ 商品详情加载成功')
+                } else {
+                    error.value = result.msg || '加载商品详情失败'
+                    console.error('✗ API返回错误:', result)
+                }
+            } catch (e) {
+                error.value = '网络错误：' + e.message
+                console.error('✗ 加载失败:', e)
+            } finally {
+                loading.value = false
+            }
+        }
+        
+        // 返回上一页
+        const goBack = () => {
+            if (window.history.length > 1) {
+                window.history.back()
+            } else {
+                window.location.href = 'index.html'
+            }
+        }
+        
+        return {
+            loading,
+            error,
+            goods,
+            activeTab,
+            isDark,
+            toggleTheme,
+            goBack
+        }
+    }
+}).mount('#app')
+</script>
+
+</body>
+</html>

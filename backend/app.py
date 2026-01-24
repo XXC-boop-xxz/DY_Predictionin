@@ -43,8 +43,15 @@ register_routes(app)
 
 @app.route('/')
 def index():
-    """首页重定向到登录页"""
-    return app.send_static_file('login.html')
+    """首页 - 营销页面"""
+    return app.send_static_file('home.html')
+
+
+@app.route('/app')
+@app.route('/dashboard')
+def dashboard():
+    """系统后台"""
+    return app.send_static_file('index.html')
 
 
 @app.route('/<path:filename>')

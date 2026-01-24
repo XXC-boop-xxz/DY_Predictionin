@@ -4,13 +4,11 @@
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
     <title>抖音电商热点数据可视化分析系统</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet"/>
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
-    <script src="js/toast.js"></script>
+    <link href="css/fonts.css?v=4" rel="stylesheet"/>
+    <script src="lib/vue.global.dev.js?v=4"></script>
+    <script src="lib/echarts.min.js?v=4"></script>
+    <script src="lib/tailwind.min.js?v=4"></script>
+    <script src="js/toast.js?v=4"></script>
     <script>
         tailwind.config = {
             darkMode: "class",
@@ -36,11 +34,34 @@
         ::-webkit-scrollbar-thumb:hover { background: #13c8ec; }
         .sidebar-item:hover { background: rgba(19, 200, 236, 0.1); }
         .sidebar-item.active { background: rgba(19, 200, 236, 0.2); border-left: 3px solid #13c8ec; }
+        
+        /* Vue 未挂载前隐藏应用 */
+        [v-cloak] { display: none !important; }
+        
+        /* 亮色主题样式 */
+        .light-theme {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f6f8f8;
+            --bg-card: #ffffff;
+            --border-color: #e0e0e0;
+            --text-primary: #0d191b;
+            --text-secondary: #4c8d9a;
+        }
+        
+        /* 暗色主题样式 */
+        .dark-theme {
+            --bg-primary: #101f22;
+            --bg-secondary: #16282b;
+            --bg-card: #1a3035;
+            --border-color: #325e67;
+            --text-primary: #ffffff;
+            --text-secondary: #92c0c9;
+        }
     </style>
 </head>
-<body class="bg-background-dark font-sans text-white antialiased">
+<body class="bg-background-dark font-sans text-white antialiased" :class="isDark ? 'dark-theme' : 'light-theme'">
 
-<div id="app" class="flex h-screen">
+<div id="app" class="flex h-screen" v-cloak>
     <!-- 侧边栏 -->
     <aside class="w-64 bg-surface-dark border-r border-input-border flex flex-col">
         <!-- Logo -->
@@ -57,7 +78,7 @@
         <nav class="flex-1 py-4 overflow-y-auto">
             <div class="px-4 mb-2 text-xs text-text-secondary uppercase tracking-wider">主菜单</div>
             
-            <a v-for="item in menuItems" :key="item.path"
+            <a v-for="item in filteredMenuItems" :key="item.path"
                :href="item.path"
                :class="['sidebar-item flex items-center gap-3 px-6 py-3 text-sm transition-colors', 
                         currentPath === item.path ? 'active text-primary' : 'text-gray-300 hover:text-white']">
@@ -68,7 +89,7 @@
         
         <!-- 用户信息 -->
         <div class="p-4 border-t border-input-border">
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-3 mb-3">
                 <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
                     <span class="material-symbols-outlined text-primary">person</span>
                 </div>
@@ -80,6 +101,12 @@
                     <span class="material-symbols-outlined text-text-secondary hover:text-red-400">logout</span>
                 </button>
             </div>
+            <!-- 主题切换按钮 -->
+            <button @click="toggleTheme" class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-input-bg hover:bg-primary/10 rounded-lg transition-colors">
+                <span v-if="isDark" class="material-symbols-outlined text-yellow-400">light_mode</span>
+                <span v-else class="material-symbols-outlined text-primary">dark_mode</span>
+                <span class="text-sm">{{ isDark ? '亮色模式' : '暗色模式' }}</span>
+            </button>
         </div>
     </aside>
     
@@ -108,8 +135,97 @@
                 </div>
             </div>
             
-            <!-- 快捷操作 -->
+            <!-- 商品列表 -->
             <div class="bg-card-dark rounded-xl p-6 border border-input-border mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold">商品列表</h2>
+                    <div class="flex items-center gap-2">
+                        <button @click="refreshGoods" class="px-3 py-1.5 bg-input-bg hover:bg-primary/10 rounded-lg text-sm transition-colors">
+                            <span class="material-symbols-outlined text-base">refresh</span>
+                        </button>
+                        <select v-model="goodsSort" @change="loadGoods" class="px-3 py-1.5 bg-input-bg border border-input-border rounded-lg text-sm">
+                            <option value="created_at">最新</option>
+                            <option value="price">价格</option>
+                            <option value="cos_fee">佣金</option>
+                            <option value="view_num">浏览量</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- 商品网格 -->
+                <div v-if="goodsList.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4">
+                    <div v-for="goods in goodsList" :key="goods.product_id" 
+                         @click="openGoodsDetail(goods.product_id)"
+                         class="bg-input-bg rounded-lg overflow-hidden border border-input-border hover:border-primary transition-all cursor-pointer group">
+                        <!-- 商品图片 -->
+                        <div class="relative aspect-square overflow-hidden bg-surface-dark">
+                            <img :src="goods.cover" :alt="goods.title" 
+                                 class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                 @error="$event.target.src='https://via.placeholder.com/400x400?text=No+Image'">
+                            <!-- 标签 -->
+                            <div v-if="goods.labels && goods.labels.length > 0" class="absolute top-2 left-2 flex flex-wrap gap-1">
+                                <span v-for="(label, idx) in goods.labels.slice(0, 2)" :key="idx"
+                                      class="px-2 py-0.5 bg-primary/90 text-background-dark text-xs rounded">
+                                    {{ typeof label === 'string' ? label : label.name }}
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <!-- 商品信息 -->
+                        <div class="p-3">
+                            <!-- 标题 -->
+                            <h3 class="text-sm font-medium line-clamp-2 mb-2 min-h-[2.5rem]">{{ goods.title }}</h3>
+                            
+                            <!-- 价格和佣金 -->
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-baseline gap-1">
+                                    <span class="text-red-400 text-lg font-bold">¥{{ (goods.price || 0).toFixed(2) }}</span>
+                                    <span v-if="(goods.coupon || 0) > 0" class="text-xs text-text-secondary line-through">¥{{ ((goods.price || 0) + (goods.coupon || 0)).toFixed(2) }}</span>
+                                </div>
+                                <div class="text-xs text-primary">
+                                    佣金 ¥{{ (goods.cos_fee || 0).toFixed(2) }}
+                                </div>
+                            </div>
+                            
+                            <!-- 店铺和销量 -->
+                            <div class="flex items-center justify-between text-xs text-text-secondary">
+                                <span class="truncate flex-1">{{ goods.shop_name || '未知店铺' }}</span>
+                                <span class="ml-2">销量 {{ (goods.sales || 0).toLocaleString() }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 空状态 -->
+                <div v-else class="text-center py-12 text-text-secondary">
+                    <span class="material-symbols-outlined text-6xl mb-4 opacity-50">inventory_2</span>
+                    <p>暂无商品数据</p>
+                    <p class="text-sm mt-2">请先运行爬虫获取数据</p>
+                </div>
+                
+                <!-- 分页 -->
+                <div v-if="goodsTotal > 0" class="flex items-center justify-between pt-4 border-t border-input-border">
+                    <div class="text-sm text-text-secondary">
+                        共 {{ goodsTotal }} 个商品，第 {{ goodsPage }}/{{ goodsTotalPages }} 页
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button @click="goodsPage > 1 && (goodsPage--, loadGoods())" 
+                                :disabled="goodsPage <= 1"
+                                class="px-3 py-1.5 bg-input-bg hover:bg-primary/10 rounded-lg text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                            上一页
+                        </button>
+                        <button @click="goodsPage < goodsTotalPages && (goodsPage++, loadGoods())" 
+                                :disabled="goodsPage >= goodsTotalPages"
+                                class="px-3 py-1.5 bg-input-bg hover:bg-primary/10 rounded-lg text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                            下一页
+                        </button>
+                    </div>
+                </div>
+            </div>
+            </div>
+            
+            <!-- 快捷操作 - 仅管理员可见 -->
+            <div v-if="hasPermission('crawler:start')" class="bg-card-dark rounded-xl p-6 border border-input-border mb-6">
                 <h2 class="text-lg font-semibold mb-4">快捷操作</h2>
                 <div class="flex flex-wrap gap-4">
                     <button @click="startListCrawler" 
@@ -126,8 +242,8 @@
                 </div>
             </div>
             
-            <!-- 最近任务 -->
-            <div class="bg-card-dark rounded-xl p-6 border border-input-border">
+            <!-- 系统状态 - 仅管理员可见 -->
+            <div v-if="hasPermission('crawler:start')" class="bg-card-dark rounded-xl p-6 border border-input-border">
                 <h2 class="text-lg font-semibold mb-4">系统状态</h2>
                 <div class="space-y-3">
                     <div class="flex items-center justify-between p-3 bg-input-bg rounded-lg">
@@ -161,7 +277,7 @@
     </main>
     
     <!-- 爬虫配置弹窗 -->
-    <div v-if="showCrawlerConfig" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div v-if="showCrawlerConfig" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showCrawlerConfig = false">
         <div class="bg-surface-dark rounded-xl p-6 w-full max-w-md border border-input-border">
             <div class="flex items-center justify-between mb-6">
                 <h3 class="text-lg font-semibold">爬虫配置</h3>
@@ -198,7 +314,7 @@
 </div>
 
 <script>
-const { createApp, ref, reactive, computed, onMounted, onUnmounted } = Vue
+const { createApp, ref, reactive, computed, onMounted, onUnmounted, watch } = Vue
 
 const API_BASE = 'http://localhost:5000/api'
 
@@ -209,11 +325,57 @@ createApp({
         const mqStatus = ref(false)
         const crawlerLoading = ref(false)
         const showCrawlerConfig = ref(false)
+        const isDark = ref(true)  // 默认暗色主题
+        
+        // 监控 showCrawlerConfig 的变化
+        watch(showCrawlerConfig, (newVal, oldVal) => {
+            console.log('!!! showCrawlerConfig 值改变了 !!!');
+            console.log('旧值:', oldVal, '新值:', newVal);
+            console.trace('调用堆栈:');
+            
+            // 如果不是通过按钮点击改变的，强制设置回 false
+            if (newVal === true) {
+                console.warn('检测到异常的 true 值，强制设置为 false');
+                // 不要在这里设置，会导致无限循环
+            }
+        })
+        
+        // 调试输出
+        console.log('=== Vue 应用初始化 ===')
+        console.log('showCrawlerConfig 初始值:', showCrawlerConfig.value)
+        console.log('user 初始值:', user.value)
+        
+        // 立即检查是否有什么改变了值
+        setTimeout(() => {
+            console.log('=== 100ms后检查 ===')
+            console.log('showCrawlerConfig 当前值:', showCrawlerConfig.value)
+        }, 100)
+        
+        setTimeout(() => {
+            console.log('=== 500ms后检查 ===')
+            console.log('showCrawlerConfig 当前值:', showCrawlerConfig.value)
+        }, 500)
         
         const crawlerConfig = reactive({
             start_page: 1,
             end_page: 5
         })
+        
+        // 商品数据
+        const goodsList = ref([])
+        const goodsPage = ref(1)
+        const goodsPageSize = ref(20)
+        const goodsTotal = ref(0)
+        const goodsTotalPages = ref(0)
+        const goodsSort = ref('created_at')
+        const goodsLoading = ref(false)
+        
+        // 权限检查函数
+        const hasPermission = (permissionCode) => {
+            if (!user.value) return false  // 用户未加载，返回 false
+            if (!user.value.permissions) return false  // 没有权限列表，返回 false
+            return user.value.permissions.includes(permissionCode)
+        }
         
         const menuItems = [
             { name: '首页', path: 'index.html', icon: 'home' },
@@ -221,19 +383,35 @@ createApp({
             { name: '达人分析', path: 'influencers.html', icon: 'person_search' },
             { name: '直播分析', path: 'live.html', icon: 'live_tv' },
             { name: '视频分析', path: 'videos.html', icon: 'play_circle' },
-            { name: '爬虫任务', path: 'crawler.html', icon: 'bug_report' },
-            { name: '系统设置', path: 'settings.html', icon: 'settings' },
+            { name: '爬虫任务', path: 'crawler.html', icon: 'bug_report', permission: 'crawler:start' },
+            { name: '系统设置', path: 'settings.html', icon: 'settings', permission: 'system:manage' },
         ]
         
-        const currentPath = ref('index.html')
-        const currentMenu = computed(() => menuItems.find(m => m.path === currentPath.value))
+        // 根据权限过滤菜单
+        const filteredMenuItems = computed(() => {
+            return menuItems.filter(item => {
+                if (!item.permission) return true
+                return hasPermission(item.permission)
+            })
+        })
         
-        const stats = ref([
+        const currentPath = ref('index.html')
+        const currentMenu = computed(() => filteredMenuItems.value.find(m => m.path === currentPath.value))
+        
+        const statsData = [
             { label: '商品总数', value: '12,458', icon: 'inventory_2', color: 'text-primary', desc: '已采集商品' },
             { label: '今日新增', value: '328', icon: 'add_circle', color: 'text-green-400', desc: '较昨日 +12%' },
             { label: '达人数量', value: '5,621', icon: 'group', color: 'text-purple-400', desc: '关联达人' },
-            { label: '任务队列', value: '15', icon: 'queue', color: 'text-yellow-400', desc: '待处理任务' },
-        ])
+            { label: '任务队列', value: '15', icon: 'queue', color: 'text-yellow-400', desc: '待处理任务', permission: 'crawler:start' },
+        ]
+        
+        // 根据权限过滤统计卡片
+        const stats = computed(() => {
+            return statsData.filter(stat => {
+                if (!stat.permission) return true
+                return hasPermission(stat.permission)
+            })
+        })
         
         // 获取 token
         const getToken = () => localStorage.getItem('token')
@@ -268,12 +446,18 @@ createApp({
             const token = getToken()
             const savedUser = localStorage.getItem('user')
             
+            console.log('=== 检查登录状态 ===')
+            console.log('token:', token ? '存在' : '不存在')
+            console.log('savedUser:', savedUser ? '存在' : '不存在')
+            
             if (!token || !savedUser) {
                 window.location.href = 'login.html'
                 return
             }
             
             user.value = JSON.parse(savedUser)
+            console.log('用户信息:', user.value)
+            console.log('用户权限:', user.value.permissions)
         }
         
         // 退出登录
@@ -282,6 +466,63 @@ createApp({
             localStorage.removeItem('token')
             localStorage.removeItem('user')
             window.location.href = 'login.html'
+        }
+        
+        // 加载商品列表
+        const loadGoods = async () => {
+            console.log('=== 开始加载商品 ===')
+            console.log('页码:', goodsPage.value, '排序:', goodsSort.value)
+            goodsLoading.value = true
+            try {
+                const result = await request(`/goods/list?page=${goodsPage.value}&page_size=${goodsPageSize.value}&sort_by=${goodsSort.value}&order=desc`)
+                
+                console.log('API响应:', result)
+                
+                if (result.code === 0) {
+                    goodsList.value = result.data.list
+                    goodsTotal.value = result.data.total
+                    goodsTotalPages.value = result.data.total_pages
+                    
+                    console.log('商品数量:', goodsList.value.length)
+                    
+                    // 解析JSON字段
+                    goodsList.value.forEach(goods => {
+                        if (typeof goods.labels === 'string') {
+                            try {
+                                goods.labels = JSON.parse(goods.labels)
+                            } catch (e) {
+                                goods.labels = []
+                            }
+                        }
+                        if (typeof goods.tags === 'string') {
+                            try {
+                                goods.tags = JSON.parse(goods.tags)
+                            } catch (e) {
+                                goods.tags = {}
+                            }
+                        }
+                    })
+                } else {
+                    console.error('API返回错误:', result)
+                    Toast.error('加载商品失败: ' + result.msg)
+                }
+            } catch (e) {
+                console.error('加载商品失败:', e)
+                Toast.error('加载商品失败: ' + e.message)
+            } finally {
+                goodsLoading.value = false
+            }
+        }
+        
+        // 刷新商品
+        const refreshGoods = () => {
+            goodsPage.value = 1
+            loadGoods()
+        }
+        
+        // 打开商品详情（新标签页）
+        const openGoodsDetail = (productId) => {
+            window.open(`goods_detail.html?id=${productId}`, '_blank')
         }
         
         // 启动列表爬虫
@@ -298,6 +539,10 @@ createApp({
                     if (result.data.note) {
                         setTimeout(() => Toast.info(result.data.note), 500)
                     }
+                    // 延迟刷新商品列表
+                    setTimeout(() => {
+                        refreshGoods()
+                    }, 3000)
                 } else {
                     Toast.error('发送失败: ' + result.message)
                 }
@@ -333,20 +578,53 @@ createApp({
         }
         
         onMounted(() => {
+            console.log('=== onMounted 执行 ===')
+            console.log('showCrawlerConfig 在 mounted:', showCrawlerConfig.value)
+            
             checkAuth()
             updateTime()
             timeInterval = setInterval(updateTime, 1000)
             checkMqStatus()
+            loadGoods()  // 加载商品列表
+            
+            // 初始化主题
+            const savedTheme = localStorage.getItem('theme')
+            if (savedTheme === 'light') {
+                isDark.value = false
+                document.body.classList.remove('dark-theme')
+                document.body.classList.add('light-theme')
+            } else {
+                isDark.value = true
+                document.body.classList.remove('light-theme')
+                document.body.classList.add('dark-theme')
+            }
+            
+            console.log('showCrawlerConfig 在 mounted 结束:', showCrawlerConfig.value)
         })
         
         onUnmounted(() => {
             clearInterval(timeInterval)
         })
         
+        // 切换主题
+        const toggleTheme = () => {
+            isDark.value = !isDark.value
+            if (isDark.value) {
+                document.body.classList.remove('light-theme')
+                document.body.classList.add('dark-theme')
+                localStorage.setItem('theme', 'dark')
+            } else {
+                document.body.classList.remove('dark-theme')
+                document.body.classList.add('light-theme')
+                localStorage.setItem('theme', 'light')
+            }
+        }
+        
         return {
             user,
             currentTime,
             menuItems,
+            filteredMenuItems,
             currentPath,
             currentMenu,
             stats,
@@ -354,11 +632,66 @@ createApp({
             crawlerLoading,
             showCrawlerConfig,
             crawlerConfig,
+            isDark,
+            goodsList,
+            goodsPage,
+            goodsPageSize,
+            goodsTotal,
+            goodsTotalPages,
+            goodsSort,
+            goodsLoading,
+            hasPermission,
             handleLogout,
-            startListCrawler
+            startListCrawler,
+            toggleTheme,
+            loadGoods,
+            refreshGoods,
+            openGoodsDetail
         }
     }
 }).mount('#app')
+</script>
+
+<!-- 临时调试和修复脚本 -->
+<script>
+// 立即执行，不等待DOMContentLoaded
+(function() {
+    console.log('=== 立即修复脚本执行 ===');
+    
+    // 使用MutationObserver监听DOM变化
+    const observer = new MutationObserver(function(mutations) {
+        const allFixed = document.querySelectorAll('.fixed');
+        allFixed.forEach(function(el) {
+            if (el.textContent.includes('爬虫配置') && el.style.display !== 'none') {
+                console.log('检测到爬虫配置对话框出现，立即隐藏');
+                el.style.display = 'none';
+                el.style.visibility = 'hidden';
+            }
+        });
+    });
+    
+    // 开始观察
+    observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['style', 'class']
+    });
+    
+    // 页面加载后也检查一次
+    window.addEventListener('DOMContentLoaded', function() {
+        setTimeout(function() {
+            const allFixed = document.querySelectorAll('.fixed');
+            allFixed.forEach(function(el) {
+                if (el.textContent.includes('爬虫配置')) {
+                    console.log('DOMContentLoaded: 强制隐藏爬虫配置对话框');
+                    el.style.display = 'none';
+                    el.style.visibility = 'hidden';
+                }
+            });
+        }, 100);
+    });
+})();
 </script>
 
 </body>
