@@ -47,6 +47,18 @@ def index():
     return app.send_static_file('home.html')
 
 
+@app.route('/login')
+def login_redirect():
+    """登录页面"""
+    return app.send_static_file('login.html')
+
+
+@app.route('/register')
+def register_redirect():
+    """注册页面"""
+    return app.send_static_file('register.html')
+
+
 @app.route('/app')
 @app.route('/dashboard')
 def dashboard():
