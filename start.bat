@@ -6,18 +6,10 @@ echo ========================================
 echo.
 
 echo [1] 检查 RabbitMQ...
-docker ps | findstr rabbitmq >nul
-if %errorlevel% neq 0 (
-    echo     启动 RabbitMQ...
-    docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management
-    timeout /t 10 >nul
-) else (
-    echo     RabbitMQ 已运行
-)
 
 echo.
 echo [2] 启动 Flask 后端...
-start "Flask Backend" cmd /k "cd /d %~dp0 && .env\Scripts\pip.exe install eventlet && .env\Scripts\python.exe backend/app.py"
+start "Flask Backend" cmd /k "cd /d %~dp0 && .env\Scripts\python.exe backend/app.py"
 
 echo.
 echo [3] 启动爬虫 Workers...
