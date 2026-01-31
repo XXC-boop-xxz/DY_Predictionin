@@ -4,11 +4,11 @@
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
     <title>抖音电商热点数据可视化分析系统</title>
-    <link href="css/fonts.css?v=4" rel="stylesheet"/>
-    <script src="lib/vue.global.dev.js?v=4"></script>
-    <script src="lib/echarts.min.js?v=4"></script>
-    <script src="lib/tailwind.min.js?v=4"></script>
-    <script src="js/toast.js?v=4"></script>
+    <link href="css/fonts.css?v=5" rel="stylesheet"/>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="js/toast.js?v=5"></script>
     <script>
         tailwind.config = {
             darkMode: "class",
@@ -22,6 +22,9 @@
                         "input-bg": "#192f33",
                         "input-border": "#325e67",
                         "text-secondary": "#92c0c9"
+                    },
+                    fontFamily: {
+                        "sans": ["Inter", "Noto Sans SC", "sans-serif"]
                     }
                 }
             }
@@ -37,6 +40,16 @@
         
         /* Vue 未挂载前隐藏应用 */
         [v-cloak] { display: none !important; }
+        
+        /* 强制隐藏所有固定定位的遮罩层，直到 Vue 明确显示 */
+        .fixed.inset-0.bg-black\/50 {
+            display: none !important;
+        }
+        
+        /* 只有当 Vue 添加了特定类时才显示 */
+        .fixed.inset-0.bg-black\/50.show-dialog {
+            display: flex !important;
+        }
         
         /* 亮色主题样式 */
         .light-theme {
@@ -57,11 +70,16 @@
             --text-primary: #ffffff;
             --text-secondary: #92c0c9;
         }
+        
+        /* 确保中文字体正确显示 */
+        body, * {
+            font-family: "Inter", "Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
     </style>
 </head>
-<body class="bg-background-dark font-sans text-white antialiased" :class="isDark ? 'dark-theme' : 'light-theme'">
+<body class="bg-background-dark font-sans text-white antialiased">
 
-<div id="app" class="flex h-screen" v-cloak>
+<div id="app" class="flex h-screen" v-cloak :class="isDark ? 'dark-theme' : 'light-theme'">
     <!-- 侧边栏 -->
     <aside class="w-64 bg-surface-dark border-r border-input-border flex flex-col">
         <!-- Logo -->
@@ -222,7 +240,6 @@
                     </div>
                 </div>
             </div>
-            </div>
             
             <!-- 快捷操作 - 仅管理员可见 -->
             <div v-if="hasPermission('crawler:start')" class="bg-card-dark rounded-xl p-6 border border-input-border mb-6">
@@ -234,7 +251,7 @@
                         <span class="material-symbols-outlined text-xl">play_arrow</span>
                         启动列表爬虫
                     </button>
-                    <button @click="showCrawlerConfig = true"
+                    <button @click="showCrawlerConfig = true; dialogOpenedByUser = true"
                             class="flex items-center gap-2 px-4 py-2 bg-input-bg border border-input-border rounded-lg hover:border-primary transition-colors">
                         <span class="material-symbols-outlined text-xl">settings</span>
                         爬虫配置
@@ -277,37 +294,46 @@
     </main>
     
     <!-- 爬虫配置弹窗 -->
-    <div v-if="showCrawlerConfig" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showCrawlerConfig = false">
-        <div class="bg-surface-dark rounded-xl p-6 w-full max-w-md border border-input-border">
-            <div class="flex items-center justify-between mb-6">
+    <div v-if="showCrawlerConfig && dialogOpenedByUser" 
+         class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+         @click.self="showCrawlerConfig = false; dialogOpenedByUser = false">
+        <div class="bg-card-dark rounded-xl p-6 border border-input-border w-full max-w-md mx-4">
+            <div class="flex items-center justify-between mb-4">
                 <h3 class="text-lg font-semibold">爬虫配置</h3>
-                <button @click="showCrawlerConfig = false" class="text-text-secondary hover:text-white">
+                <button @click="showCrawlerConfig = false; dialogOpenedByUser = false" 
+                        class="p-1 hover:bg-input-bg rounded-lg transition-colors">
                     <span class="material-symbols-outlined">close</span>
                 </button>
             </div>
             
             <div class="space-y-4">
-                <label class="block">
-                    <span class="text-sm text-text-secondary mb-1 block">起始页码</span>
-                    <input v-model.number="crawlerConfig.start_page" type="number" min="1"
-                           class="w-full h-10 px-3 rounded-lg bg-input-bg border border-input-border text-white focus:border-primary focus:ring-1 focus:ring-primary"/>
-                </label>
-                <label class="block">
-                    <span class="text-sm text-text-secondary mb-1 block">结束页码</span>
-                    <input v-model.number="crawlerConfig.end_page" type="number" min="1"
-                           class="w-full h-10 px-3 rounded-lg bg-input-bg border border-input-border text-white focus:border-primary focus:ring-1 focus:ring-primary"/>
-                </label>
-            </div>
-            
-            <div class="flex gap-3 mt-6">
-                <button @click="showCrawlerConfig = false"
-                        class="flex-1 h-10 rounded-lg border border-input-border hover:border-primary transition-colors">
-                    取消
-                </button>
-                <button @click="startListCrawler(); showCrawlerConfig = false"
-                        class="flex-1 h-10 rounded-lg bg-primary text-background-dark font-medium hover:bg-primary/90 transition-colors">
-                    开始爬取
-                </button>
+                <div>
+                    <label class="block text-sm text-text-secondary mb-2">起始页</label>
+                    <input v-model.number="crawlerConfig.start_page" 
+                           type="number" 
+                           min="1"
+                           class="w-full px-3 py-2 bg-input-bg border border-input-border rounded-lg focus:border-primary focus:outline-none">
+                </div>
+                
+                <div>
+                    <label class="block text-sm text-text-secondary mb-2">结束页</label>
+                    <input v-model.number="crawlerConfig.end_page" 
+                           type="number" 
+                           min="1"
+                           class="w-full px-3 py-2 bg-input-bg border border-input-border rounded-lg focus:border-primary focus:outline-none">
+                </div>
+                
+                <div class="flex items-center gap-3 pt-4">
+                    <button @click="startListCrawler(); showCrawlerConfig = false; dialogOpenedByUser = false" 
+                            :disabled="crawlerLoading"
+                            class="flex-1 px-4 py-2 bg-primary text-background-dark rounded-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">
+                        启动爬虫
+                    </button>
+                    <button @click="showCrawlerConfig = false; dialogOpenedByUser = false" 
+                            class="flex-1 px-4 py-2 bg-input-bg border border-input-border rounded-lg hover:border-primary transition-colors">
+                        取消
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -324,37 +350,17 @@ createApp({
         const currentTime = ref('')
         const mqStatus = ref(false)
         const crawlerLoading = ref(false)
-        const showCrawlerConfig = ref(false)
-        const isDark = ref(true)  // 默认暗色主题
+        const showCrawlerConfig = ref(false)  // 明确初始化为 false
+        const isDark = ref(true)
         
-        // 监控 showCrawlerConfig 的变化
-        watch(showCrawlerConfig, (newVal, oldVal) => {
-            console.log('!!! showCrawlerConfig 值改变了 !!!');
-            console.log('旧值:', oldVal, '新值:', newVal);
-            console.trace('调用堆栈:');
-            
-            // 如果不是通过按钮点击改变的，强制设置回 false
-            if (newVal === true) {
-                console.warn('检测到异常的 true 值，强制设置为 false');
-                // 不要在这里设置，会导致无限循环
-            }
-        })
+        // 添加一个标志，确保对话框只能通过按钮打开
+        const dialogOpenedByUser = ref(false)
         
-        // 调试输出
-        console.log('=== Vue 应用初始化 ===')
-        console.log('showCrawlerConfig 初始值:', showCrawlerConfig.value)
-        console.log('user 初始值:', user.value)
-        
-        // 立即检查是否有什么改变了值
-        setTimeout(() => {
-            console.log('=== 100ms后检查 ===')
-            console.log('showCrawlerConfig 当前值:', showCrawlerConfig.value)
-        }, 100)
-        
-        setTimeout(() => {
-            console.log('=== 500ms后检查 ===')
-            console.log('showCrawlerConfig 当前值:', showCrawlerConfig.value)
-        }, 500)
+        // 添加诊断：监控 showCrawlerConfig 的变化
+        if (typeof window !== 'undefined') {
+            window.__showCrawlerConfig = showCrawlerConfig
+            console.log('[诊断] showCrawlerConfig 初始值:', showCrawlerConfig.value)
+        }
         
         const crawlerConfig = reactive({
             start_page: 1,
@@ -446,18 +452,12 @@ createApp({
             const token = getToken()
             const savedUser = localStorage.getItem('user')
             
-            console.log('=== 检查登录状态 ===')
-            console.log('token:', token ? '存在' : '不存在')
-            console.log('savedUser:', savedUser ? '存在' : '不存在')
-            
             if (!token || !savedUser) {
                 window.location.href = 'login.html'
                 return
             }
             
             user.value = JSON.parse(savedUser)
-            console.log('用户信息:', user.value)
-            console.log('用户权限:', user.value.permissions)
         }
         
         // 退出登录
@@ -470,20 +470,14 @@ createApp({
         
         // 加载商品列表
         const loadGoods = async () => {
-            console.log('=== 开始加载商品 ===')
-            console.log('页码:', goodsPage.value, '排序:', goodsSort.value)
             goodsLoading.value = true
             try {
                 const result = await request(`/goods/list?page=${goodsPage.value}&page_size=${goodsPageSize.value}&sort_by=${goodsSort.value}&order=desc`)
-                
-                console.log('API响应:', result)
                 
                 if (result.code === 0) {
                     goodsList.value = result.data.list
                     goodsTotal.value = result.data.total
                     goodsTotalPages.value = result.data.total_pages
-                    
-                    console.log('商品数量:', goodsList.value.length)
                     
                     // 解析JSON字段
                     goodsList.value.forEach(goods => {
@@ -503,7 +497,6 @@ createApp({
                         }
                     })
                 } else {
-                    console.error('API返回错误:', result)
                     Toast.error('加载商品失败: ' + result.msg)
                 }
             } catch (e) {
@@ -578,14 +571,15 @@ createApp({
         }
         
         onMounted(() => {
-            console.log('=== onMounted 执行 ===')
-            console.log('showCrawlerConfig 在 mounted:', showCrawlerConfig.value)
+            // 第一优先级：强制确保对话框关闭
+            showCrawlerConfig.value = false
+            dialogOpenedByUser.value = false
             
             checkAuth()
             updateTime()
             timeInterval = setInterval(updateTime, 1000)
             checkMqStatus()
-            loadGoods()  // 加载商品列表
+            loadGoods()
             
             // 初始化主题
             const savedTheme = localStorage.getItem('theme')
@@ -599,7 +593,19 @@ createApp({
                 document.body.classList.add('dark-theme')
             }
             
-            console.log('showCrawlerConfig 在 mounted 结束:', showCrawlerConfig.value)
+            // 多次检查确保对话框关闭
+            const checkDialog = () => {
+                if (showCrawlerConfig.value === true && dialogOpenedByUser.value === false) {
+                    console.error('[强制修复] 检测到对话框被异常打开，强制关闭')
+                    showCrawlerConfig.value = false
+                }
+            }
+            
+            setTimeout(checkDialog, 50)
+            setTimeout(checkDialog, 100)
+            setTimeout(checkDialog, 200)
+            setTimeout(checkDialog, 500)
+            setTimeout(checkDialog, 1000)
         })
         
         onUnmounted(() => {
@@ -631,6 +637,7 @@ createApp({
             mqStatus,
             crawlerLoading,
             showCrawlerConfig,
+            dialogOpenedByUser,
             crawlerConfig,
             isDark,
             goodsList,
@@ -650,48 +657,6 @@ createApp({
         }
     }
 }).mount('#app')
-</script>
-
-<!-- 临时调试和修复脚本 -->
-<script>
-// 立即执行，不等待DOMContentLoaded
-(function() {
-    console.log('=== 立即修复脚本执行 ===');
-    
-    // 使用MutationObserver监听DOM变化
-    const observer = new MutationObserver(function(mutations) {
-        const allFixed = document.querySelectorAll('.fixed');
-        allFixed.forEach(function(el) {
-            if (el.textContent.includes('爬虫配置') && el.style.display !== 'none') {
-                console.log('检测到爬虫配置对话框出现，立即隐藏');
-                el.style.display = 'none';
-                el.style.visibility = 'hidden';
-            }
-        });
-    });
-    
-    // 开始观察
-    observer.observe(document.documentElement, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['style', 'class']
-    });
-    
-    // 页面加载后也检查一次
-    window.addEventListener('DOMContentLoaded', function() {
-        setTimeout(function() {
-            const allFixed = document.querySelectorAll('.fixed');
-            allFixed.forEach(function(el) {
-                if (el.textContent.includes('爬虫配置')) {
-                    console.log('DOMContentLoaded: 强制隐藏爬虫配置对话框');
-                    el.style.display = 'none';
-                    el.style.visibility = 'hidden';
-                }
-            });
-        }, 100);
-    });
-})();
 </script>
 
 </body>
