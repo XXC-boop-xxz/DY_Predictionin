@@ -23,19 +23,18 @@ def get_goods_trend(product_id):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 从数据库查询趋势数据
+        # 从数据库查询最近30天的趋势数据
         cursor.execute("""
             SELECT date, sales_count, sales_amount, video_count, live_count, user_count
             FROM analysis_goods_trend
             WHERE goods_id = %s
-            ORDER BY date ASC
+            ORDER BY date DESC
             LIMIT 30
         """, (product_id,))
-        
-        rows = cursor.fetchall()
+        rows = list(reversed(cursor.fetchall()))
         cursor.close()
         conn.close()
-        
+
         if not rows:
             return jsonify({'code': -1, 'msg': '暂无趋势数据'}), 404
         
@@ -81,16 +80,16 @@ def get_goods_kol(product_id):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 从趋势数据中获取每日达人数
+        # 从趋势数据中获取最近30天每日达人数
         cursor.execute("""
             SELECT date, user_count, video_count
             FROM analysis_goods_trend
             WHERE goods_id = %s
-            ORDER BY date ASC
+            ORDER BY date DESC
             LIMIT 30
         """, (product_id,))
-        
-        trend_rows = cursor.fetchall()
+
+        trend_rows = list(reversed(cursor.fetchall()))
         
         # 获取TOP达人数据
         cursor.execute("""
@@ -155,19 +154,19 @@ def get_goods_video(product_id):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 从数据库查询视频数据
+        # 从数据库查询最近30天视频数据
         cursor.execute("""
             SELECT date, video_count, play_count, sales_count, like_count, comment_count
             FROM analysis_video_sales
             WHERE goods_id = %s
-            ORDER BY date ASC
+            ORDER BY date DESC
             LIMIT 30
         """, (product_id,))
-        
-        rows = cursor.fetchall()
+
+        rows = list(reversed(cursor.fetchall()))
         cursor.close()
         conn.close()
-        
+
         if not rows:
             return jsonify({'code': -1, 'msg': '暂无视频数据'}), 404
         
@@ -213,19 +212,19 @@ def get_goods_live(product_id):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 从数据库查询直播数据
+        # 从数据库查询最近30天直播数据
         cursor.execute("""
             SELECT date, live_count, sales_count, sales_amount, viewer_count
             FROM analysis_live_trend
             WHERE goods_id = %s
-            ORDER BY date ASC
+            ORDER BY date DESC
             LIMIT 30
         """, (product_id,))
-        
-        rows = cursor.fetchall()
+
+        rows = list(reversed(cursor.fetchall()))
         cursor.close()
         conn.close()
-        
+
         if not rows:
             return jsonify({'code': -1, 'msg': '暂无直播数据'}), 404
         

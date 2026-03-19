@@ -151,21 +151,27 @@ class AnalysisWorker(BaseWorker):
         return results
     
     def _generate_mock_if_needed(self, goods_id: str):
-        """当 API 无数据时，自动生成模拟分析数据"""
+        """当 API 无数据时，自动生成模拟分析数据（含补充缺失日期）"""
         try:
             import pymysql
+            from datetime import date
+
             conn = pymysql.connect(
                 **self.db_config, charset='utf8mb4',
                 cursorclass=pymysql.cursors.DictCursor
             )
             cursor = conn.cursor()
 
-            # 检查是否已有数据
+            # 检查已有数据的最新日期
             cursor.execute(
-                "SELECT COUNT(*) as cnt FROM analysis_goods_trend WHERE goods_id = %s",
+                "SELECT MAX(date) as latest FROM analysis_goods_trend WHERE goods_id = %s",
                 (goods_id,)
             )
-            if cursor.fetchone()['cnt'] > 0:
+            result = cursor.fetchone()
+            latest_date = result['latest'] if result else None
+
+            # 如果已有数据且最新日期已包含今天，则跳过
+            if latest_date and latest_date >= date.today():
                 conn.close()
                 return
 
@@ -178,9 +184,15 @@ class AnalysisWorker(BaseWorker):
             price = float(row['price']) if row and row['price'] else 10.0
             cursor.close()
 
+            # generate_mock_data_for_product 使用 INSERT IGNORE，
+            # 已有日期会跳过，只插入缺失的新日期
             from backend.utils.mock_data import generate_mock_data_for_product
             generate_mock_data_for_product(conn, goods_id, price)
-            self.log.info(f"已为商品 {goods_id} 生成模拟分析数据")
+
+            if latest_date:
+                self.log.info(f"已为商品 {goods_id} 补充 {latest_date} 至今天的模拟数据")
+            else:
+                self.log.info(f"已为商品 {goods_id} 生成模拟分析数据")
             conn.close()
         except Exception as e:
             self.log.error(f"生成模拟数据失败: {e}")

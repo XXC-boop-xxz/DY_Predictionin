@@ -155,23 +155,45 @@ def start_detail_crawler():
 @permission_required('crawler:start')
 def start_batch_detail():
     """
-    批量爬取所有商品的详情+分析
+    批量爬取新商品的详情+分析
 
-    从 goods_list 中取出所有 product_id，
-    为每个商品发送 detail_q 和 analysis_q 任务。
+    只为尚未有分析数据或分析数据未更新到今天的商品发送任务。
+    已有最新数据的商品会被跳过。
     """
     from backend.models.base import get_db_connection
+    from datetime import date
 
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT product_id FROM goods_list")
+        today = str(date.today())
+
+        # 查询没有分析数据 或 分析数据未更新到今天 的商品
+        cursor.execute("""
+            SELECT gl.product_id
+            FROM goods_list gl
+            LEFT JOIN (
+                SELECT goods_id, MAX(date) as latest
+                FROM analysis_goods_trend
+                GROUP BY goods_id
+            ) agt ON gl.product_id = agt.goods_id
+            WHERE agt.goods_id IS NULL OR agt.latest < %s
+        """, (today,))
         rows = cursor.fetchall()
+
+        # 同时统计总数，用于返回信息
+        cursor.execute("SELECT COUNT(*) as total FROM goods_list")
+        total = cursor.fetchone()['total']
+
         cursor.close()
         conn.close()
 
         if not rows:
-            return jsonify({'success': False, 'message': '商品列表为空，请先爬取商品列表'}), 400
+            return jsonify({
+                'success': True,
+                'message': f'所有 {total} 个商品的分析数据均已是最新，无需更新',
+                'data': {'count': 0}
+            })
 
         product_ids = [r['product_id'] for r in rows]
         ts = int(time.time())
@@ -198,22 +220,21 @@ def start_batch_detail():
 
         _save_task_log(batch_task_id, 'batch_detail',
                        json.dumps({'count': sent, 'product_ids': product_ids[:5]}))
-        # 批量任务发送完成后直接标记为 completed（实际执行由各 Worker 独立处理）
         try:
             conn2 = get_db_connection()
             with conn2.cursor() as c2:
                 c2.execute("UPDATE crawler_task_log SET status='completed', result=%s WHERE task_id=%s",
-                           (f'已发送 {sent} 个商品的详情+分析任务', batch_task_id))
+                           (f'已发送 {sent} 个商品的详情+分析任务（跳过 {total - sent} 个已有最新数据的商品）', batch_task_id))
             conn2.commit()
             conn2.close()
         except Exception:
             pass
-        log_operation('批量爬取详情+分析', '爬虫', f"共 {sent} 个商品")
+        log_operation('批量爬取商品详情+分析', '爬虫', f"需更新 {sent} 个，跳过 {total - sent} 个")
 
         return jsonify({
             'success': True,
-            'message': f'已为 {sent} 个商品发送详情爬取+数据分析任务',
-            'data': {'task_id': batch_task_id, 'count': sent}
+            'message': f'已为 {sent} 个商品发送任务（跳过 {total - sent} 个已有最新数据的商品）',
+            'data': {'task_id': batch_task_id, 'count': sent, 'skipped': total - sent}
         })
     except Exception as e:
         return jsonify({

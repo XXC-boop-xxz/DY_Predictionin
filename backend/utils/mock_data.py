@@ -212,7 +212,7 @@ def generate_mock_data_for_product(conn, product_id: str, price: float, days: in
 
 def generate_all_mock_data(db_config: dict, days: int = 30, force: bool = False):
     """
-    为所有缺少分析数据的商品生成模拟数据
+    为所有缺少或过期分析数据的商品生成模拟数据
 
     Args:
         db_config: 数据库连接配置
@@ -229,17 +229,22 @@ def generate_all_mock_data(db_config: dict, days: int = 30, force: bool = False)
     cursor.execute("SELECT product_id, price FROM goods_list")
     products = cursor.fetchall()
 
-    # 获取已有趋势数据的商品
+    # 获取已有数据且日期已到今天的商品（这些才是真正可以跳过的）
+    today = datetime.now().date()
+    skipped = set()
     if not force:
-        cursor.execute("SELECT DISTINCT goods_id FROM analysis_goods_trend")
-        existing = {r['goods_id'] for r in cursor.fetchall()}
-    else:
-        existing = set()
+        cursor.execute("""
+            SELECT goods_id, MAX(date) as latest
+            FROM analysis_goods_trend
+            GROUP BY goods_id
+            HAVING MAX(date) >= %s
+        """, (str(today),))
+        skipped = {r['goods_id'] for r in cursor.fetchall()}
 
     generated = 0
     for p in products:
         pid = p['product_id']
-        if pid in existing:
+        if pid in skipped:
             continue
 
         price = float(p['price']) if p['price'] else 10.0
@@ -252,7 +257,7 @@ def generate_all_mock_data(db_config: dict, days: int = 30, force: bool = False)
 
     cursor.close()
     conn.close()
-    return {'total': len(products), 'generated': generated, 'skipped': len(existing)}
+    return {'total': len(products), 'generated': generated, 'skipped': len(skipped)}
 
 
 if __name__ == '__main__':
